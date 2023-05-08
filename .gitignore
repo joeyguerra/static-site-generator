@@ -1,0 +1,10 @@
+.DS_Store
+node_modules
+.hubot_history
+.node-version
+npm-debug.log
+assets
+dist
+scripts
+templates
+www

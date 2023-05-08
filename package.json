@@ -1,0 +1,43 @@
+{
+  "name": "static-site-generator",
+  "main": "./hfab.mjs",
+  "bin": {
+    "hfab": "./bin/hfab"
+  },
+  "version": "1.0.0",
+  "description": "Static site generator. From markdown to html with metadata and handlebars.",
+  "keywords": [
+    "static",
+    "site",
+    "generator",
+    "markdown",
+    "handlebars",
+    "html"
+  ],
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joeyguerra/static-site-generator.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Joey Guerra",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "express": "^4.18.2",
+    "handlebars": "^4.7.7",
+    "markdown-it": "^13.0.1",
+    "markdown-it-meta": "^0.0.1"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node  --watch ./hfab.mjs",
+    "bin": "bin/hfab"
+  }
+}

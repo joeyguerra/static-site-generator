@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+
+const hfab = (async () => {
+    return await import('../hfab.mjs')
+})()
+
