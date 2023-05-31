@@ -17,6 +17,9 @@ const stream = new EventStream();
 Object.keys(args).forEach(key=>{
     stream.addMessage(`events:args:${key}`, new KeyValueEvent(key, args[key]))
 })
+if(Object.keys(args).length == 0) {
+    stream.addMessage('events:args:help', new KeyValueEvent('help', true))
+}
 
 const log = (...parameters) => {
     if(args.verbose) console.log(new Date(), ...parameters)
@@ -28,6 +31,7 @@ Usage: hfab [options]
     --file          The markdown file to transform into HTML
     --folder        The folder where the static files are located (defaults to ./www)
     --destination   The folder where the static files will be saved (defaults to ./dist)
+    --scripts       The folder where scripts are located to agument the build process 
     --serve         Serve the static files
     --copy          Copy files in this folder to the destination
     --verbose       Show verbose output
@@ -187,13 +191,17 @@ const copyFilesFromSourceToDestination = async (files, source, destination, hook
 }
 
 const getFilesRecursively = async function *(folder) {
-    for await (let file of await File.readdir(folder, { withFileTypes: true })) {
-        if (file.isDirectory()) {
-            yield* getFilesRecursively(path.join(folder, file.name))
-        } else {
-            file.path = (file.path ?? folder) // file.path wasn't added until node 20.1.0
-            yield file
-        }
+    try {
+        for await (let file of await File.readdir(folder, { withFileTypes: true })) {
+            if (file.isDirectory()) {
+                yield* getFilesRecursively(path.join(folder, file.name))
+            } else {
+                file.path = (file.path ?? folder) // file.path wasn't added until node 20.1.0
+                yield file
+            }
+        }    
+    } catch(e) {
+        console.error(e)
     }
 }
 
@@ -228,12 +236,15 @@ const transform = async (files, source, destination, hooks) => {
 
 
 const scriptsFolder = []
-for await(let script of await getFilesRecursively('./scripts')) {
-    scriptsFolder.push(script)
-}
-const scripts = await loadScripts(scriptsFolder, app, args)
+let scripts = []
 
-
+stream.createGroup('handlers:scripts', 'events:args:scripts', async messages => {
+    const scriptsFolder = []
+    for await(let script of await getFilesRecursively(args.scripts, { withFileTypes: true })) {
+        scriptsFolder.push(script)
+    }
+    scripts = await loadScripts(scriptsFolder, app, args)    
+})
 stream.createGroup('handlers:help', 'events:args:help', async messages => {
     console.log(help)
     process.exit(0)
