@@ -4,7 +4,7 @@
   "bin": {
     "hfab": "./bin/hfab"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Static site generator. From markdown to html with metadata and handlebars.",
   "keywords": [
     "static",
@@ -37,7 +37,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "start": "node  --watch ./hfab.mjs",
-    "bin": "bin/hfab"
+    "start": "node --watch bin/hfab",
+    "hubot": "npm start -- --folder ../../hubotio/hubot/docs --destination ../../hubotio/hubot/dist --verbose --serve"
   }
 }

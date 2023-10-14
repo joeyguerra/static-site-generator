@@ -1,6 +1,39 @@
 #!/usr/bin/env node
 
-const hfab = (async () => {
-    return await import('../hfab.mjs')
-})()
+const spawn = require('child_process').spawn
+const resolve = require('path').resolve
+const map = (args) => {
+    const options = {}
+    return args.reduce((acc, arg, i) => {
+        if(arg == null) return acc
+        if(arg.toString().length == 0) return acc
+        if (arg.toString().startsWith('--')) {
+            const optionName = arg.slice(2)
+            if (acc[optionName]) {
+                if (!Array.isArray(acc[optionName])) {
+                    acc[optionName] = [acc[optionName]]
+                }
+                acc[optionName].push(args[i+1])
+                return acc
+            }
+            
+            if (!args[i+1]) {
+                acc[optionName] = true
+                return acc
+            }
 
+            acc[optionName] = args[i+1]?.toString().indexOf('--') > -1 ? true : args[i+1]
+        }
+        return acc
+    }, options)
+}
+
+const args = process.argv.slice(2)
+const nodePath = process.argv[0]
+const hfabPath = resolve(__dirname, '../hfab.mjs')
+const hfabArgs = map(process.argv.slice(2))
+let nodeArgs = [hfabPath, ...args]
+if(hfabArgs['watch-path']) {
+    nodeArgs.unshift('--watch-path', hfabArgs['watch-path'])
+}
+const hfab = spawn(nodePath, nodeArgs, { stdio: 'inherit' })

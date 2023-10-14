@@ -1,6 +1,6 @@
 import { promises as File, createReadStream, createWriteStream } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { map } from './CliArgsParser.mjs'
 import express from 'express'
 import MarkdownIt from 'markdown-it'
@@ -31,7 +31,7 @@ Usage: hfab [options]
     --file          The markdown file to transform into HTML
     --folder        The folder where the static files are located (defaults to ./www)
     --destination   The folder where the static files will be saved (defaults to ./dist)
-    --scripts       The folder where scripts are located to agument the build process 
+    --scripts       The folder where scripts are located to augment the build process
     --serve         Serve the static files
     --copy          Copy files in this folder to the destination
     --verbose       Show verbose output
@@ -79,14 +79,14 @@ app.engine('html', async (filename, options, cb) => {
     log('rendering ', filename)
     cb(null, template({...props, ...options}))
 })
-
+const posts = []
 app.engine('md', async (filePath, options, callback)=>{
     try{
         let data = await File.readFile(filePath, 'utf-8')
         let output = markdown.render(data)
         output = `{{#> ${markdown.meta.layout}}}\n${output}{{/${markdown.meta.layout}}}\n`
-        markdown.meta.uri = filePath.replace(`${__dirname}`, '').replace('.md', '.html')
-        markdown.meta.relativeLink = markdown.meta.uri.replace(/^\//, '')
+        markdown.meta.permalink = filePath.replace(`${__dirname}`, '').replace('.md', '.html')
+        markdown.meta.relativeLink = markdown.meta.permalink.replace(/^\//, '')
         markdown.meta.tags = markdown.meta?.tags ?? []
         let template = handlebars.compile(output)
         try{
@@ -105,17 +105,43 @@ app.engine('md', async (filePath, options, callback)=>{
 
 app.use(express.static(args.destination ?? DESTINATION))
 
+handlebars.registerHelper('compare', function(...args){
+    const options = args.pop()
+    const a = args.shift()
+    if(args.length == 1){
+        const b = args.shift()
+        if(a == b){
+            return options.fn(this)
+        } else {
+            return options.inverse(this)
+        }
+    }
+
+    if(args.indexOf(a) > -1){
+        return options.fn(this)
+    } else {
+        return options.inverse(this)
+    }
+})
+handlebars.registerHelper('unescapeAmp', function(){
+    return this.source.url.replaceAll('&amp;', '&')
+})
+handlebars.registerHelper('current', (a, b)=>{
+    if(!a) return ''
+    return a.endsWith(b) ? ' current' : ''
+})
+
 const registerPartials = async (folder, handlebars) => {
     const files = await File.readdir(folder, { withFileTypes: true })
     for await (let file of files) {
-        const filePath = `${folder}/${file.name}`  
+        const filePath = `${folder}/${file.name}`
         if (file.isDirectory()) {
             await registerPartials(filePath, handlebars)
         } else {
             if(!(filePath.toLowerCase().includes('layouts') || filePath.toLowerCase().includes('partials'))) continue
             if (!filePath.endsWith('.html')) continue
             
-            const partialName = filePath.split(path.sep).slice(1).join(path.sep)
+            const partialName = filePath.split(`${path.sep}${args.folder.split(path.sep).pop()}${path.sep}`).pop().replace(/^\//, '') //filePath.split(path.sep).slice(1).join(path.sep)
             const partial = await File.readFile(filePath, 'utf-8')
             log(folder, partialName)
             handlebars.registerPartial(partialName, partial)
@@ -125,7 +151,6 @@ const registerPartials = async (folder, handlebars) => {
 
 const render = async (files, app, source, destination, hooks = []) => {
     const uris = []
-    destination = destination.replace('./', '').replace(/^\//, '')
     app.set('views', [source])
     for await (let file of files) {
         if(file.path.toLowerCase().includes('/layouts') || file.path.toLowerCase().includes('/partials')) continue
@@ -151,8 +176,7 @@ const render = async (files, app, source, destination, hooks = []) => {
             if (err) {
                 console.error('error rendering', err)
                 console.error('file', file.name)
-                reject(err)
-                return
+                throw err
             }
             html = html.split('\n').map(line => line.trim().replace(/^\s+/, '')).join('\n')
 
@@ -251,11 +275,11 @@ stream.createGroup('handlers:help', 'events:args:help', async messages => {
 })
 stream.createGroup('handlers:folder', 'events:args:folder', async messages => {
     const filesInFolder = []
-    const folderWithoutDot = args.folder.replace('./', '')
+    const folderWithoutDot = pathToFileURL(args.folder).pathname
     for await (let file of await getFilesRecursively(folderWithoutDot, { withFileTypes: true })) {
         filesInFolder.push(file)
     }
-    await transform(filesInFolder, folderWithoutDot, args.destination ?? DESTINATION, scripts)
+    await transform(filesInFolder, folderWithoutDot, pathToFileURL(args.destination).pathname ?? DESTINATION, scripts)
 })
 stream.createGroup('handlers:file', 'events:args:file', async messages => {
     const parts = args.file.replace('./', '').split(path.sep)
